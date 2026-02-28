@@ -1,13 +1,12 @@
-const CACHE_NAME = 'chloes-spanish-v2';
-const ASSETS = [
-  'chloe-spanish.html',
-  'manifest.json'
-];
+const CACHE_NAME = 'chloes-spanish-v3';
 
-// Install: cache all assets
+// Install: cache all local assets
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(['chloe-spanish.html', 'manifest.json', 'icon.png'])
+        .then(() => cache.add(new Request('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght=400;600;700;800&display=swap', { mode: 'no-cors' })).catch(() => {}));
+    })
   );
   self.skipWaiting();
 });
@@ -22,9 +21,18 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Fetch: serve from cache, fall back to network
+// Fetch: cache first, then network, cache new responses for offline use
 self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request))
+    caches.match(event.request).then(cached => {
+      if (cached) return cached;
+      return fetch(event.request).then(response => {
+        if (response && response.status === 200) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+        }
+        return response;
+      }).catch(() => caches.match('chloe-spanish.html'));
+    })
   );
 });
